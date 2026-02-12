@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@media print {
+
+  /* Hide the login navigation, sidebar, and buttons from the PDF */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Ensure the background colors and borders show up in the print preview */
+  body {
+    background: white !important;
+    padding: 0 !important;
+  }
+
+  .print\:block {
+    display: block !important;
+  }
+
+  .print\:border-black {
+    border-color: #000 !important;
+  }
+}
