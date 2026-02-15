@@ -4,11 +4,12 @@ import { supabase } from '../supabaseClient';
 const ArchDashboard = () => {
     const [logs, setLogs] = useState([]);
     const [foranes, setForanes] = useState([]);
-    const [newForaneName, setNewForaneName] = useState("");
-    const [newParish, setNewParish] = useState({ name: "", foraneId: "" });
     const [totals, setTotals] = useState({ income: 0, expense: 0 });
+    const [newForane, setNewForane] = useState({ name: "", user: "", pass: "" });
+    const [newParish, setNewParish] = useState({ name: "", foraneId: "", user: "", pass: "" });
 
     const fetchData = async () => {
+        // 1. Fetch Global Financial Feed
         const { data: entries } = await supabase
             .from('financial_entries')
             .select(`
@@ -24,149 +25,200 @@ const ArchDashboard = () => {
             setTotals({ income: inc, expense: exp });
         }
 
+        // 2. Fetch Foranes for registration dropdown
         const { data: fData } = await supabase.from('foranes').select('id, name');
         setForanes(fData || []);
     };
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => {
+        fetchData();
+    }, []);
 
-    const handleDownloadPDF = () => { window.print(); };
-
-    const handleAddForane = async () => {
-        if (!newForaneName) return;
-        const { data: archData } = await supabase.from('archdioceses').select('id').limit(1).single();
-        const { error } = await supabase
-            .from('foranes')
-            .insert([{ name: newForaneName, archdiocese_id: archData.id }]);
-        if (!error) { alert("Forane Registered!"); setNewForaneName(""); fetchData(); }
+    const handleDownloadPDF = () => {
+        window.print();
     };
 
-    const handleAddParish = async () => {
-        if (!newParish.name || !newParish.foraneId) return;
-        const { error } = await supabase
+    // --- ADMINISTRATIVE FUNCTIONS ---
+
+    const handleRegisterForane = async () => {
+        if (!newForane.name || !newForane.user || !newForane.pass) {
+            alert("Please fill all forane fields");
+            return;
+        }
+
+        const { data: archData } = await supabase.from('archdioceses').select('id').limit(1).single();
+
+        const { data: fData, error: fError } = await supabase
+            .from('foranes')
+            .insert([{ name: newForane.name, archdiocese_id: archData?.id }])
+            .select().single();
+
+        if (fError) {
+            alert(fError.message);
+            return;
+        }
+
+        const { error: uError } = await supabase.from('users').insert([{
+            username: newForane.user,
+            password: newForane.pass,
+            role: 'forane',
+            forane_id: fData.id
+        }]);
+
+        if (!uError) {
+            alert("Forane and Credentials Created Successfully!");
+            setNewForane({ name: "", user: "", pass: "" });
+            fetchData();
+        } else {
+            alert(uError.message);
+        }
+    };
+
+    const handleRegisterParish = async () => {
+        if (!newParish.name || !newParish.foraneId || !newParish.user || !newParish.pass) {
+            alert("Please fill all parish fields");
+            return;
+        }
+
+        const { data: pData, error: pError } = await supabase
             .from('parishes')
-            .insert([{ name: newParish.name, forane_id: newParish.foraneId }]);
-        if (!error) { alert("Parish Registered!"); setNewParish({ name: "", foraneId: "" }); fetchData(); }
+            .insert([{ name: newParish.name, forane_id: newParish.foraneId }])
+            .select().single();
+
+        if (pError) {
+            alert(pError.message);
+            return;
+        }
+
+        const { error: uError } = await supabase.from('users').insert([{
+            username: newParish.user,
+            password: newParish.pass,
+            role: 'parish',
+            parish_id: pData.id
+        }]);
+
+        if (!uError) {
+            alert("Parish and Credentials Created Successfully!");
+            setNewParish({ name: "", foraneId: "", user: "", pass: "" });
+            fetchData();
+        } else {
+            alert(uError.message);
+        }
     };
 
     return (
-        <div className="space-y-6 md:space-y-8 px-2 md:px-0">
-            {/* Header & Download Section */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print">
-                <h2 className="text-2xl md:text-3xl font-black text-blue-900">Diocese Overview</h2>
+        <div className="min-h-screen bg-[#f1f5f9] p-4 md:p-8 space-y-10 font-sans">
+
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 no-print border-b-2 border-slate-300 pb-8">
+                <div>
+                    <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight uppercase">Authority Portal</h2>
+                    <p className="text-slate-600 font-bold text-sm mt-1 uppercase tracking-widest">Archdiocese Oversight</p>
+                </div>
                 <button
                     onClick={handleDownloadPDF}
-                    className="w-full sm:w-auto bg-green-600 text-white px-6 py-3 sm:py-2 rounded-xl font-bold flex justify-center items-center gap-2 hover:bg-green-700 transition shadow-lg"
+                    className="w-full md:w-auto border-2 border-slate-900 bg-white text-slate-900 px-8 py-3 rounded-xl font-black hover:bg-slate-900 hover:text-white transition-all active:scale-95 shadow-md"
                 >
-                    Download Audit Report
+                    DOWNLOAD AUDIT REPORT
                 </button>
             </div>
 
-            {/* Printable PDF Header */}
-            <div className="hidden print:block text-center mb-10">
-                <h1 className="text-2xl font-bold text-black">AccuFlow Financial Audit Report</h1>
-                <p className="text-sm">Latin Arch Diocese - Trivandrum, Kerala</p>
-                <p className="text-xs text-gray-500">Report Generated: {new Date().toLocaleString()}</p>
-                <hr className="my-4 border-black" />
-            </div>
-
-            {/* Metrics Summary - Stacks on mobile */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
-                <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border-l-4 border-blue-600 print:border-black">
-                    <p className="text-xs font-bold text-gray-400 uppercase">Total Income</p>
-                    <h2 className="text-xl md:text-2xl font-black text-gray-900">₹{totals.income.toLocaleString()}</h2>
+            {/* Metrics Section - 2px Borders */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-8 rounded-3xl border-2 border-emerald-500 shadow-sm">
+                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Total Income</p>
+                    <h2 className="text-3xl font-black text-slate-900 mt-2">₹{totals.income.toLocaleString()}</h2>
                 </div>
-                <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border-l-4 border-red-500 print:border-black">
-                    <p className="text-xs font-bold text-gray-400 uppercase">Total Expense</p>
-                    <h2 className="text-xl md:text-2xl font-black text-gray-900">₹{totals.expense.toLocaleString()}</h2>
+                <div className="bg-white p-8 rounded-3xl border-2 border-rose-500 shadow-sm">
+                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Total Expense</p>
+                    <h2 className="text-3xl font-black text-slate-900 mt-2">₹{totals.expense.toLocaleString()}</h2>
                 </div>
-                <div className="bg-blue-900 p-5 md:p-6 rounded-2xl shadow-sm text-white print:bg-gray-100 print:text-black print:border print:border-black">
-                    <p className="text-xs font-bold opacity-80 uppercase print:text-black">Net Assets</p>
-                    <h2 className="text-xl md:text-2xl font-black">₹{(totals.income - totals.expense).toLocaleString()}</h2>
+                <div className="bg-slate-900 p-8 rounded-3xl border-2 border-slate-900 text-white shadow-xl">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Net Assets</p>
+                    <h2 className="text-3xl font-black mt-2 text-emerald-400">₹{(totals.income - totals.expense).toLocaleString()}</h2>
                 </div>
             </div>
 
-            {/* Admin Controls - Stacks on mobile */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print">
-                <div className="bg-white p-5 md:p-6 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="font-bold text-blue-900 mb-4 text-sm uppercase tracking-wider">Register Forane</h3>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                        <input className="flex-1 p-3 sm:p-2 border rounded-lg text-sm" placeholder="Forane Name" value={newForaneName} onChange={e => setNewForaneName(e.target.value)} />
-                        <button onClick={handleAddForane} className="bg-blue-900 text-white px-4 py-3 sm:py-2 rounded-lg text-sm font-bold">Add Forane</button>
-                    </div>
-                </div>
-                <div className="bg-white p-5 md:p-6 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="font-bold text-blue-900 mb-4 text-sm uppercase tracking-wider">Register Parish</h3>
-                    <div className="flex flex-col gap-2">
-                        <select className="p-3 sm:p-2 border rounded-lg text-sm" onChange={e => setNewParish({ ...newParish, foraneId: e.target.value })} value={newParish.foraneId}>
-                            <option value="">Select Target Forane...</option>
-                            {foranes.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                        </select>
-                        <div className="flex flex-col sm:flex-row gap-2">
-                            <input className="flex-1 p-3 sm:p-2 border rounded-lg text-sm" placeholder="Parish Name" value={newParish.name} onChange={e => setNewParish({ ...newParish, name: e.target.value })} />
-                            <button onClick={handleAddParish} className="bg-blue-600 text-white px-4 py-3 sm:py-2 rounded-lg text-sm font-bold">Add Parish</button>
+            {/* Administration Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 no-print">
+                {/* Forane Card */}
+                <div className="bg-white p-8 rounded-3xl border-2 border-slate-300 shadow-md space-y-6">
+                    <h3 className="font-black text-slate-900 text-xl border-b-2 border-slate-100 pb-3 uppercase">Register Forane</h3>
+                    <div className="space-y-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-black text-slate-700 uppercase ml-1">Forane Name</label>
+                            <input className="w-full p-4 border-2 border-slate-400 rounded-xl font-bold bg-slate-50 outline-none focus:border-blue-600 transition-all" placeholder="Enter Name" value={newForane.name} onChange={e => setNewForane({ ...newForane, name: e.target.value })} />
                         </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-black text-slate-700 uppercase ml-1">Assigned User ID</label>
+                                <input className="w-full p-4 border-2 border-slate-400 rounded-xl font-bold" placeholder="User ID" value={newForane.user} onChange={e => setNewForane({ ...newForane, user: e.target.value })} />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-black text-slate-700 uppercase ml-1">Passkey</label>
+                                <input className="w-full p-4 border-2 border-slate-400 rounded-xl font-bold" type="text" placeholder="Password" value={newForane.pass} onChange={e => setNewForane({ ...newForane, pass: e.target.value })} />
+                            </div>
+                        </div>
+                        <button onClick={handleRegisterForane} className="w-full bg-slate-900 text-white py-4 rounded-xl font-black uppercase tracking-widest hover:bg-blue-800 transition-all shadow-md">Authorize Forane Account</button>
+                    </div>
+                </div>
+
+                {/* Parish Card */}
+                <div className="bg-white p-8 rounded-3xl border-2 border-slate-300 shadow-md space-y-6">
+                    <h3 className="font-black text-slate-900 text-xl border-b-2 border-slate-100 pb-3 uppercase">Register Parish</h3>
+                    <div className="space-y-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-black text-slate-700 uppercase ml-1">Jurisdiction</label>
+                            <select className="w-full p-4 border-2 border-slate-400 rounded-xl font-bold bg-slate-50 outline-none" value={newParish.foraneId} onChange={e => setNewParish({ ...newParish, foraneId: e.target.value })}>
+                                <option value="">Select Forane...</option>
+                                {foranes.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-black text-slate-700 uppercase ml-1">Church Name</label>
+                            <input className="w-full p-4 border-2 border-slate-400 rounded-xl font-bold bg-slate-50" placeholder="Parish Name" value={newParish.name} onChange={e => setNewParish({ ...newParish, name: e.target.value })} />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <input className="p-4 border-2 border-slate-400 rounded-xl font-bold" placeholder="Assign User ID" value={newParish.user} onChange={e => setNewParish({ ...newParish, user: e.target.value })} />
+                            <input className="p-4 border-2 border-slate-400 rounded-xl font-bold" type="text" placeholder="Assign Passkey" value={newParish.pass} onChange={e => setNewParish({ ...newParish, pass: e.target.value })} />
+                        </div>
+                        <button onClick={handleRegisterParish} className="w-full bg-blue-700 text-white py-4 rounded-xl font-black uppercase tracking-widest hover:bg-blue-900 transition-all shadow-md">Generate Parish Account</button>
                     </div>
                 </div>
             </div>
 
-            {/* Live Activity - Table for Desktop, Cards for Mobile */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden print:border-black">
-                {/* Desktop View Table */}
-                <div className="hidden md:block">
-                    <table className="w-full text-left">
-                        <thead className="bg-gray-50 border-b border-gray-200 print:bg-gray-100">
-                            <tr className="text-[10px] font-bold text-gray-400 uppercase">
-                                <th className="px-6 py-4">Time</th>
-                                <th className="px-6 py-4">Church / Forane</th>
-                                <th className="px-6 py-4">Category</th>
-                                <th className="px-6 py-4 text-right">Amount</th>
+            {/* Audit Table - High Contrast 2px Borders */}
+            <div className="bg-white rounded-3xl border-2 border-slate-900 overflow-hidden shadow-xl">
+                <div className="p-6 bg-slate-900 text-white font-black uppercase tracking-widest text-sm">
+                    Global Transaction Audit Log
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-slate-100 border-b-2 border-slate-900 text-[10px] font-black text-slate-700 uppercase tracking-[0.2em]">
+                                <th className="px-8 py-5 border-r-2 border-slate-200">Date</th>
+                                <th className="px-8 py-5 border-r-2 border-slate-200">Origin Unit</th>
+                                <th className="px-8 py-5 border-r-2 border-slate-200">Category</th>
+                                <th className="px-8 py-4 text-right">Value (₹)</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y-2 divide-slate-200">
                             {logs.map((item, i) => (
                                 <tr key={i} className="hover:bg-blue-50 transition-colors">
-                                    <td className="px-6 py-4 text-xs text-gray-400">
-                                        {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    <td className="px-8 py-5 text-xs font-black border-r-2 border-slate-200">{new Date(item.created_at).toLocaleDateString()}</td>
+                                    <td className="px-8 py-5 border-r-2 border-slate-200">
+                                        <div className="text-sm font-black text-slate-900">{item.parishes?.name}</div>
+                                        <div className="text-[10px] text-blue-700 font-black uppercase tracking-widest">{item.parishes?.foranes?.name}</div>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <div className="text-sm font-bold text-gray-900">{item.parishes?.name}</div>
-                                        <div className="text-[10px] text-blue-600 font-bold uppercase">{item.parishes?.foranes?.name}</div>
-                                    </td>
-                                    <td className="px-6 py-4 text-xs text-gray-500 font-medium">{item.category}</td>
-                                    <td className="px-6 py-4 text-right">
-                                        <span className="text-sm font-bold text-green-600">₹{item.income}</span>
-                                        <div className="text-[10px] text-red-400">- ₹{item.expense}</div>
+                                    <td className="px-8 py-5 border-r-2 border-slate-200 text-[10px] font-black text-slate-600 uppercase tracking-wider">{item.category}</td>
+                                    <td className="px-8 py-5 text-right font-black">
+                                        <div className="text-emerald-700 text-lg">₹{item.income.toLocaleString()}</div>
+                                        <div className="text-rose-600 text-xs">-₹{item.expense.toLocaleString()}</div>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                </div>
-
-                {/* Mobile View Card List */}
-                <div className="md:hidden divide-y divide-gray-100">
-                    <div className="bg-gray-50 p-4 text-[10px] font-bold text-gray-400 uppercase">Live Activity Feed</div>
-                    {logs.map((item, i) => (
-                        <div key={i} className="p-4 space-y-2">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <div className="text-sm font-bold text-gray-900">{item.parishes?.name}</div>
-                                    <div className="text-[10px] text-blue-600 font-bold uppercase">{item.parishes?.foranes?.name}</div>
-                                </div>
-                                <div className="text-xs text-gray-400">
-                                    {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </div>
-                            </div>
-                            <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
-                                <span className="text-xs text-gray-500 font-medium">{item.category}</span>
-                                <div className="text-right">
-                                    <span className="text-sm font-bold text-green-600">₹{item.income}</span>
-                                    <span className="text-[10px] text-red-400 ml-2">- ₹{item.expense}</span>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
                 </div>
             </div>
         </div>

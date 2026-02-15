@@ -3,17 +3,25 @@ import React, { createContext, useState, useContext } from "react";
 const RoleContext = createContext();
 
 export const RoleProvider = ({ children }) => {
-    const [isLoggedIn, setIsLoggedIn] = useState(false); // New state
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [role, setRole] = useState(null);
     const [currentForaneId, setCurrentForaneId] = useState(null);
     const [currentParishId, setCurrentParishId] = useState(null);
+
+    const logout = () => {
+        setIsLoggedIn(false);
+        setRole(null);
+        setCurrentForaneId(null);
+        setCurrentParishId(null);
+    };
 
     return (
         <RoleContext.Provider value={{
             isLoggedIn, setIsLoggedIn,
             role, setRole,
             currentForaneId, setCurrentForaneId,
-            currentParishId, setCurrentParishId
+            currentParishId, setCurrentParishId,
+            logout
         }}>
             {children}
         </RoleContext.Provider>
