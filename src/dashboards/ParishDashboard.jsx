@@ -4,171 +4,182 @@ import { useRole } from '../context/RoleContext';
 
 const ParishDashboard = () => {
     const { currentParishId } = useRole();
-    const [formData, setFormData] = useState({ income: 0, expense: 0, category: 'Offerings', desc: "" });
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // 1. Fetch the remittance history for this specific parish
+    // Ledger Entry State
+    const [entry, setEntry] = useState({ type: 'income', category: 'Sunday Collection', amount: 0, desc: "" });
+
+    // Bank Statement State (Matching Excel Fields)
+    const [bankData, setBankData] = useState({
+        savings_opening: 0, savings_dep: 0, savings_with: 0,
+        fd_opening: 0, fd_dep: 0, fd_with: 0
+    });
+
+    // ... (incomeCategories and expenseCategories stay the same) ...
+    const incomeCategories = ['Balance in Hand', 'Monthly Subscription', 'Holi Mass', 'Sunday Collection', 'Auctions', 'Vault', 'Agricultural Income', 'Rent', 'Donation- Specific purpose', 'Grant - Church/School', 'Bank Interest/Savings', 'Exclusive Income', 'Capital Income (Loan/Land)', 'Bank Withdrawal', 'Mission Sunday/Good Friday', 'Other Income'];
+    const expenseCategories = ['Pastoral Ministry', 'Church Feast', 'Family Ministry', 'BCC', 'Youth Ministry', 'Laity Ministry', 'Social Service Ministry', 'Education Ministry', 'Fisheries', 'Maintenance', 'Agricultural Expenses', 'Capital Expenses', 'Salary & Allowances', 'Tax and Fees', 'Contribution to Diocese/Forane', 'Other Expenses', 'Bank Deposit', 'Cash in Hand'];
+
     const fetchHistory = async () => {
         if (!currentParishId) return;
-        const { data, error } = await supabase
-            .from("financial_entries")
-            .select("*")
-            .eq("parish_id", currentParishId)
-            .order("created_at", { ascending: false });
-
-        if (!error) setHistory(data || []);
+        const { data } = await supabase.from("financial_entries").select("*").eq("parish_id", currentParishId).order("created_at", { ascending: false });
+        setHistory(data || []);
     };
 
-    useEffect(() => {
-        fetchHistory();
-    }, [currentParishId]);
+    useEffect(() => { fetchHistory(); }, [currentParishId]);
 
-    const handleSubmit = async (e) => {
+    const handleSubmitLedger = async (e) => {
         e.preventDefault();
         setLoading(true);
-
-        const { error } = await supabase
-            .from("financial_entries")
-            .insert([{
-                parish_id: currentParishId,
-                income: parseFloat(formData.income),
-                expense: parseFloat(formData.expense),
-                category: formData.category,
-                description: formData.desc
-            }]);
-
+        const payload = {
+            parish_id: currentParishId,
+            category: entry.category,
+            income: entry.type === 'income' ? parseFloat(entry.amount) : 0,
+            expense: entry.type === 'expense' ? parseFloat(entry.amount) : 0,
+            description: entry.desc
+        };
+        const { error } = await supabase.from("financial_entries").insert([payload]);
         setLoading(false);
-        if (error) {
-            alert("Submission Error: " + error.message);
-        } else {
-            alert("Financial record successfully synced to the Archdiocese.");
-            setFormData({ income: 0, expense: 0, category: 'Offerings', desc: "" });
-            fetchHistory();
-        }
+        if (!error) { alert("Ledger Entry Recorded"); setEntry({ ...entry, amount: 0, desc: "" }); fetchHistory(); }
     };
 
-    return (
-        <div className="min-h-screen bg-[#f1f5f9] p-4 md:p-8 space-y-10 font-sans">
+    const handleSaveBankStatement = async () => {
+        setLoading(true);
+        const { error } = await supabase.from("bank_statements").insert([{
+            parish_id: currentParishId,
+            savings_opening_balance: parseFloat(bankData.savings_opening),
+            savings_deposit: parseFloat(bankData.savings_dep),
+            savings_withdrawal: parseFloat(bankData.savings_with),
+            fd_opening_balance: parseFloat(bankData.fd_opening),
+            fd_deposit: parseFloat(bankData.fd_dep),
+            fd_withdrawal: parseFloat(bankData.fd_with)
+        }]);
+        setLoading(false);
+        if (!error) alert("Monthly Bank Statement Reconciled & Saved!");
+    };
 
-            {/* Header Section */}
+    // Calculate Totals for the UI
+    const savingsTotal = parseFloat(bankData.savings_opening) + parseFloat(bankData.savings_dep);
+    const savingsClosing = savingsTotal - parseFloat(bankData.savings_with);
+    const fdTotal = parseFloat(bankData.fd_opening) + parseFloat(bankData.fd_dep);
+    const fdClosing = fdTotal - parseFloat(bankData.fd_with);
+
+    return (
+        <div className="min-h-screen bg-[#f1f5f9] p-4 md:p-8 space-y-12 font-sans pb-20">
+            {/* Header stays the same */}
             <div className="border-b-2 border-slate-300 pb-6">
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Parish Portal</h2>
-                <p className="text-slate-600 font-bold text-sm mt-1 uppercase tracking-widest">Submit Data to Archdiocese</p>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Parish Digital Ledger</h2>
+                <p className="text-slate-600 font-bold text-sm mt-1 uppercase tracking-widest">St. Mary's Pongummoodu</p>
             </div>
 
-            <div className="max-w-4xl mx-auto space-y-10">
-
-                {/* SECTION 1: Data Entry Form */}
-                <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-300 shadow-xl">
-                    <header className="mb-8 border-b-2 border-slate-100 pb-4">
-                        <h3 className="text-xl font-black text-blue-900 uppercase">Monthly Remittance</h3>
-                        <p className="text-slate-400 text-xs font-bold mt-1 uppercase">Digital Entry Form</p>
-                    </header>
-
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-xs font-black text-slate-700 uppercase ml-1">Submission Category</label>
-                                <select
-                                    className="w-full p-4 bg-slate-50 border-2 border-slate-400 rounded-xl font-bold outline-none focus:border-blue-600 transition-all cursor-pointer"
-                                    value={formData.category}
-                                    onChange={e => setFormData({ ...formData, category: e.target.value })}
-                                >
-                                    <option value="Offerings">Sunday Offerings</option>
-                                    <option value="Donations">Special Donations</option>
-                                    <option value="Maintenance">Maintenance/Utilities</option>
-                                    <option value="Salaries">Staff Salaries</option>
-                                </select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-slate-700 uppercase ml-1">Income (₹)</label>
-                                    <input
-                                        type="number"
-                                        className="w-full p-4 bg-white border-2 border-slate-400 rounded-xl font-black focus:border-emerald-600 outline-none transition-all"
-                                        value={formData.income}
-                                        onChange={e => setFormData({ ...formData, income: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-slate-700 uppercase ml-1">Expense (₹)</label>
-                                    <input
-                                        type="number"
-                                        className="w-full p-4 bg-white border-2 border-slate-400 rounded-xl font-black focus:border-rose-600 outline-none transition-all"
-                                        value={formData.expense}
-                                        onChange={e => setFormData({ ...formData, expense: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-black text-slate-700 uppercase ml-1">Narration / Remarks</label>
-                            <textarea
-                                className="w-full p-4 bg-white border-2 border-slate-400 rounded-xl h-28 font-medium outline-none focus:border-blue-600 transition-all"
-                                placeholder="Enter specific details about this remittance..."
-                                value={formData.desc}
-                                onChange={e => setFormData({ ...formData, desc: e.target.value })}
-                            />
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-blue-700 text-white py-5 rounded-2xl font-black text-lg uppercase tracking-widest hover:bg-blue-900 transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                        >
-                            {loading ? "SYNCING TO CLOUD..." : "FINALIZE REMITTANCE"}
-                        </button>
-                    </form>
+            {/* PART 1: Income/Expense Form (Existing) */}
+            <div className="max-w-4xl mx-auto bg-white rounded-[2.5rem] border-2 border-slate-300 shadow-xl overflow-hidden">
+                <div className="flex border-b-2 border-slate-300">
+                    <button onClick={() => setEntry({ ...entry, type: 'income', category: incomeCategories[0] })} className={`flex-1 py-6 font-black uppercase tracking-widest ${entry.type === 'income' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-400'}`}>Income Entry</button>
+                    <button onClick={() => setEntry({ ...entry, type: 'expense', category: expenseCategories[0] })} className={`flex-1 py-6 font-black uppercase tracking-widest ${entry.type === 'expense' ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-400'}`}>Expense Entry</button>
                 </div>
-
-                {/* SECTION 2: Remittance History */}
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-900 overflow-hidden shadow-xl">
-                    <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
-                        <div>
-                            <h4 className="font-black uppercase tracking-widest text-sm">Recent Remittances</h4>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">Digital Parish Archive</p>
+                <form onSubmit={handleSubmitLedger} className="p-8 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-700 uppercase ml-1">Ledger Item</label>
+                            <select className="w-full p-4 border-2 border-slate-400 rounded-xl font-bold bg-slate-50 outline-none" value={entry.category} onChange={e => setEntry({ ...entry, category: e.target.value })}>
+                                {(entry.type === 'income' ? incomeCategories : expenseCategories).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                            </select>
                         </div>
-                        <span className="bg-white/10 px-3 py-1 rounded-lg text-[10px] font-black uppercase">Verified</span>
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-700 uppercase ml-1">Amount (₹)</label>
+                            <input type="number" className={`w-full p-4 border-2 rounded-xl font-black outline-none ${entry.type === 'income' ? 'border-emerald-400' : 'border-rose-400'}`} value={entry.amount} onChange={e => setEntry({ ...entry, amount: e.target.value })} required />
+                        </div>
+                    </div>
+                    <button type="submit" disabled={loading} className={`w-full py-5 rounded-2xl font-black text-lg uppercase tracking-widest shadow-lg ${entry.type === 'income' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}>RECORD {entry.type.toUpperCase()}</button>
+                </form>
+            </div>
+
+            {/* NEW PART: BANK STATEMENT RECONCILIATION */}
+            <div className="max-w-4xl mx-auto bg-white rounded-[2.5rem] border-2 border-slate-900 shadow-xl overflow-hidden">
+                <div className="p-6 bg-slate-900 text-white font-black uppercase tracking-widest text-sm">
+                    Bank Statement Reconciliation (Monthly)
+                </div>
+                <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-10">
+
+                    {/* Savings Account Column */}
+                    <div className="space-y-4">
+                        <h4 className="font-black text-blue-700 border-b-2 border-blue-100 pb-2 uppercase text-sm italic">Savings Account</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase">Opening Balance</label>
+                                <input type="number" className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-sm" value={bankData.savings_opening} onChange={e => setBankData({ ...bankData, savings_opening: e.target.value })} />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase">Deposit</label>
+                                <input type="number" className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-sm" value={bankData.savings_dep} onChange={e => setBankData({ ...bankData, savings_dep: e.target.value })} />
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
+                            <span className="text-[10px] font-black text-slate-500 uppercase">Current Total</span>
+                            <span className="font-black text-slate-900">₹{savingsTotal.toLocaleString()}</span>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase">Withdrawal</label>
+                            <input type="number" className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-sm" value={bankData.savings_with} onChange={e => setBankData({ ...bankData, savings_with: e.target.value })} />
+                        </div>
+                        <div className="bg-blue-900 p-4 rounded-xl text-white flex justify-between items-center shadow-lg">
+                            <span className="text-[10px] font-black uppercase tracking-widest">Closing Balance</span>
+                            <span className="text-lg font-black text-emerald-400">₹{savingsClosing.toLocaleString()}</span>
+                        </div>
                     </div>
 
-                    <div className="divide-y-2 divide-slate-100">
-                        {history.length === 0 ? (
-                            <div className="p-12 text-center text-slate-400 font-bold uppercase text-xs tracking-widest">
-                                No previous records found.
+                    {/* Fixed Deposit Column */}
+                    <div className="space-y-4">
+                        <h4 className="font-black text-indigo-700 border-b-2 border-indigo-100 pb-2 uppercase text-sm italic">Fixed Deposit (FD)</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase">Opening Balance</label>
+                                <input type="number" className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-sm" value={bankData.fd_opening} onChange={e => setBankData({ ...bankData, fd_opening: e.target.value })} />
                             </div>
-                        ) : (
-                            history.map((item, i) => (
-                                <div key={i} className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center hover:bg-slate-50 transition-colors gap-4">
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest">
-                                                {new Date(item.created_at).toLocaleDateString()}
-                                            </p>
-                                            <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                                Ref: #{item.id.slice(0, 5)}
-                                            </p>
-                                        </div>
-                                        <h5 className="text-xl font-black text-slate-900 uppercase">{item.category}</h5>
-                                        {item.description && (
-                                            <p className="text-xs font-medium text-slate-500 italic max-w-md">
-                                                "{item.description}"
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="w-full md:w-auto text-left md:text-right border-t md:border-t-0 border-slate-100 pt-3 md:pt-0">
-                                        <p className="text-2xl font-black text-emerald-700">₹{item.income.toLocaleString()}</p>
-                                        <p className="text-xs font-black text-rose-500 uppercase tracking-tighter">- ₹{item.expense.toLocaleString()}</p>
-                                    </div>
-                                </div>
-                            ))
-                        )}
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase">Deposit</label>
+                                <input type="number" className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-sm" value={bankData.fd_dep} onChange={e => setBankData({ ...bankData, fd_dep: e.target.value })} />
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
+                            <span className="text-[10px] font-black text-slate-500 uppercase">Total FD Assets</span>
+                            <span className="font-black text-slate-900">₹{fdTotal.toLocaleString()}</span>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase">Withdrawal</label>
+                            <input type="number" className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-sm" value={bankData.fd_with} onChange={e => setBankData({ ...bankData, fd_with: e.target.value })} />
+                        </div>
+                        <div className="bg-slate-800 p-4 rounded-xl text-white flex justify-between items-center shadow-lg">
+                            <span className="text-[10px] font-black uppercase tracking-widest">Current FD Balance</span>
+                            <span className="text-lg font-black text-emerald-400">₹{fdClosing.toLocaleString()}</span>
+                        </div>
                     </div>
+
+                    <button
+                        onClick={handleSaveBankStatement}
+                        className="col-span-full bg-slate-900 text-white py-4 rounded-xl font-black uppercase tracking-[0.2em] text-xs hover:bg-blue-700 transition-all border-2 border-slate-900"
+                    >
+                        Sync Monthly Bank Statement
+                    </button>
+                </div>
+            </div>
+
+            {/* Verified History stays at the bottom */}
+            <div className="max-w-4xl mx-auto bg-white rounded-[2rem] border-2 border-slate-900 overflow-hidden shadow-lg">
+                <div className="p-6 bg-slate-900 text-white font-black uppercase tracking-widest text-sm">Verified Ledger History</div>
+                <div className="divide-y-2 divide-slate-100">
+                    {history.map((item, i) => (
+                        <div key={i} className="p-6 flex justify-between items-center hover:bg-slate-50">
+                            <div className="space-y-1">
+                                <p className={`text-[10px] font-black uppercase tracking-widest ${item.income > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>{item.category}</p>
+                                <p className="text-[10px] text-slate-400 font-bold">{new Date(item.created_at).toLocaleDateString()}</p>
+                            </div>
+                            <div className="text-right">
+                                {item.income > 0 ? <p className="text-xl font-black text-emerald-700">+ ₹{item.income.toLocaleString()}</p> : <p className="text-xl font-black text-rose-600">- ₹{item.expense.toLocaleString()}</p>}
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>

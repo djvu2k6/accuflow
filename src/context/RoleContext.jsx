@@ -7,12 +7,14 @@ export const RoleProvider = ({ children }) => {
     const [role, setRole] = useState(null);
     const [currentForaneId, setCurrentForaneId] = useState(null);
     const [currentParishId, setCurrentParishId] = useState(null);
+    const [currentSubstationId, setCurrentSubstationId] = useState(null);
 
     const logout = () => {
         setIsLoggedIn(false);
         setRole(null);
         setCurrentForaneId(null);
         setCurrentParishId(null);
+        setCurrentSubstationId(null);
     };
 
     return (
@@ -21,6 +23,7 @@ export const RoleProvider = ({ children }) => {
             role, setRole,
             currentForaneId, setCurrentForaneId,
             currentParishId, setCurrentParishId,
+            currentSubstationId, setCurrentSubstationId,
             logout
         }}>
             {children}
