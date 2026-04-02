@@ -104,6 +104,7 @@ const LoginPage = () => {
                                 User Identification
                             </label>
                             <input
+                                suppressHydrationWarning
                                 type="text"
                                 placeholder="Enter assigned ID"
                                 className="w-full p-4 bg-white border-2 border-slate-400 rounded-xl outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all text-slate-900 font-bold placeholder:text-slate-300"
@@ -119,6 +120,7 @@ const LoginPage = () => {
                             </label>
                             <div className="relative">
                                 <input
+                                    suppressHydrationWarning
                                     type={showPassword ? "text" : "password"}
                                     placeholder="••••••••"
                                     className="w-full p-4 bg-white border-2 border-slate-400 rounded-xl outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all text-slate-900 font-bold placeholder:text-slate-300"
@@ -126,6 +128,7 @@ const LoginPage = () => {
                                     required
                                 />
                                 <button
+                                    suppressHydrationWarning
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
                                     className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-black text-blue-700 uppercase tracking-widest hover:text-blue-900"
@@ -137,6 +140,7 @@ const LoginPage = () => {
 
                         {/* Action Button */}
                         <button
+                            suppressHydrationWarning
                             type="submit"
                             disabled={loading}
                             className="w-full mt-2 py-5 bg-[#0f172a] text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-blue-700 active:scale-95 transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-70"
