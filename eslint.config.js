@@ -1,27 +1,17 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import { FlatCompat } from '@eslint/eslintrc'
+import { fileURLToPath } from 'url'
+import path from 'path'
 
-export default defineConfig([
-  globalIgnores(['.next', 'node_modules']),
+const __filename = fileURLToPath(import.meta.url)
+const __dirname  = path.dirname(__filename)
+
+const compat = new FlatCompat({ baseDirectory: __dirname })
+
+export default [
+  ...compat.extends('next/core-web-vitals'),
   {
-    files: ['**/*.{js,jsx}'],
-    extends: [
-      js.configs.recommended,
-      reactHooks.configs.flat.recommended,
-    ],
-    languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        ecmaFeatures: { jsx: true },
-        sourceType: 'module',
-      },
-    },
     rules: {
-      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': 'warn',
     },
   },
-])
+]
