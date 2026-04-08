@@ -51,6 +51,7 @@ const SubstationDashboard = () => {
     const [loading,  setLoading]  = useState(false);
     const [tab,      setTab]      = useState('income');
     const [success,  setSuccess]  = useState('');
+    const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Per-category amount maps
     const [incomeAmounts,  setIncomeAmounts]  = useState(blankAmounts(incomeCategories));
@@ -86,6 +87,7 @@ const SubstationDashboard = () => {
             .map(([cat, val]) => ({
                 parish_id:     currentParishId,
                 substation_id: currentSubstationId,
+                entry_date:    entryDate,
                 category:      cat,
                 income:        tab === 'income'  ? parseFloat(val) : 0,
                 expense:       tab === 'expense' ? parseFloat(val) : 0,
@@ -166,11 +168,22 @@ const SubstationDashboard = () => {
                 <form onSubmit={handleSubmitLedger} className="p-8 space-y-8">
 
                     {/* Section label */}
-                    <div className="flex items-center gap-3">
-                        <span className={`w-3 h-3 rounded-full ${tab === 'income' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                        <p className={`text-xs font-black uppercase tracking-widest ${tab === 'income' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                            Enter amounts for each {tab} category &mdash; leave blank to skip
-                        </p>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <span className={`w-3 h-3 rounded-full ${tab === 'income' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                            <p className={`text-xs font-black uppercase tracking-widest ${tab === 'income' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                Enter amounts for each {tab} category &mdash; leave blank to skip
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 bg-slate-50 border-2 border-slate-200 px-3 py-2 rounded-xl">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Date:</label>
+                            <input 
+                                type="date" 
+                                value={entryDate}
+                                onChange={e => setEntryDate(e.target.value)}
+                                className="bg-transparent text-sm font-bold text-slate-700 outline-none"
+                            />
+                        </div>
                     </div>
 
                     {/* Category fields */}
@@ -289,7 +302,9 @@ const SubstationDashboard = () => {
                                 <p className={`text-[10px] font-black uppercase tracking-widest ${item.income > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
                                     {item.category}
                                 </p>
-                                <p className="text-[10px] text-slate-400 font-bold">{new Date(item.created_at).toLocaleDateString('en-IN')}</p>
+                                <p className="text-[10px] text-slate-400 font-bold">
+                                    {new Date(item.entry_date || item.created_at).toLocaleDateString('en-IN')}
+                                </p>
                             </div>
                             <p className={`text-xl font-black ${item.income > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
                                 {item.income > 0 ? `+ ₹${Number(item.income).toLocaleString()}` : `− ₹${Number(item.expense).toLocaleString()}`}
